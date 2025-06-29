@@ -5,17 +5,19 @@
 LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 const int LCD_COLS = 16;
 const int LCD_ROWS = 2;
-
 const byte ROWS = 4;
 const byte COLS = 6;
+
 char keys[ROWS][COLS] = {
   {'o', '7', '8', '9', '*', '/'},
   {'N', '4', '5', '6', '-', 'M'},
   {'%', '1', '2', '3', '+', 'm'},
   {'R', '0', '.', '=', '+', 'p'} 
 };
+
 byte rowPins[ROWS] = {A0, A1, A2, A3};
 byte colPins[COLS] = {0, 1, 2, 3, 4, 5};
+
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 String currentInput = "0";
@@ -23,6 +25,7 @@ String previousInput = "";
 char currentOperation = ' ';
 double memoryValue = 0.0;
 bool newOperand = true;
+bool sciFlag = false;
 
 void updateDisplay();
 void displayOnLcd(String line1, String line2 = "", int delayMs = 0);
@@ -31,7 +34,7 @@ void processOperator(char op);
 void processEquals();
 void processClear();
 void processSpecialFunction(char funcKey);
-void handleMemory(char memKey);
+void otherOptions(char memKey);
 double calculate(double num1, double num2, char op);
 String formatFloat(double num, int precision = 4);
 
@@ -47,16 +50,16 @@ void loop() {
   if (key) {
     if (isdigit(key) || key == '.') {
       processDigit(key);
-    } else if (strchr("+-*/", key)) {
+    } else if (strchr("+-*/", key) || key == '%') {
       processOperator(key);
     } else if (key == '=') {
       processEquals();
     } else if (key == 'o') {
       processClear();
-    } else if (key == 'N' || key == '%' || key == 'R') {
+    } else if (key == 'N' || key == 'R') {
       processSpecialFunction(key);
     } else if (key == 'M' || key == 'm' || key == 'p') {
-      handleMemory(key);
+      otherOptions(key);
     }
     updateDisplay();
   }
@@ -67,7 +70,7 @@ void processDigit(char digit) {
     currentInput = (digit == '.') ? "0" : "";
     newOperand = false;
   }
-  
+
   if (digit == '.' && currentInput.indexOf('.') != -1)
     return;
 
@@ -78,13 +81,12 @@ void processOperator(char op) {
   if (currentInput.length() > 0 && !newOperand) {
     if (previousInput.length() > 0 && currentOperation != ' ') {
       processEquals();
-      previousInput = currentInput;
-      currentInput = "";
     } else {
       previousInput = currentInput;
-      currentInput = "";
     }
+    currentInput = "";
   }
+
   if (previousInput.length() > 0) {
     currentOperation = op;
     newOperand = true;
@@ -97,7 +99,7 @@ void processEquals() {
     double num2 = currentInput.toFloat();
     double result = calculate(num1, num2, currentOperation);
     currentInput = formatFloat(result);
-    previousInput = "";
+    previousInput = currentInput;  // So user can continue operation on result
     currentOperation = ' ';
     newOperand = true;
   }
@@ -120,9 +122,6 @@ void processSpecialFunction(char funcKey) {
     case 'N':
       currentInput = (currentInput.startsWith("-")) ? currentInput.substring(1) : "-" + currentInput;
       return;
-    case '%':
-      result = num / 100.0;
-      break;
     case 'R':
       if (num >= 0) {
         result = sqrt(num);
@@ -136,11 +135,11 @@ void processSpecialFunction(char funcKey) {
   newOperand = true;
 }
 
-void handleMemory(char memKey) {
+void otherOptions(char key) {
   double val = currentInput.toFloat();
-  switch (memKey) {
+  switch (key) {
     case 'p': memoryValue += val; break;
-    case 'm': memoryValue -= val; break;
+    case 'm': sciFlag = sciFlag ? false : true; break;
     case 'M':
       if (!newOperand && val == memoryValue) {
         memoryValue = 0.0;
@@ -163,13 +162,14 @@ double calculate(double num1, double num2, char op) {
       displayOnLcd("Error:", "Div by Zero", 1500);
       processClear();
       return 0;
+    case '%': return ((num1 / 100) * num2);
     default: return num2;
   }
 }
 
 void updateDisplay() {
   lcd.clear();
-  String line1 = (previousInput.length() > 0) ? previousInput + currentOperation : "";
+  String line1 = (previousInput.length() > 0 && currentOperation != ' ') ? previousInput + currentOperation : "";
   String line2 = currentInput;
 
   if (line1.length() > LCD_COLS) line1 = line1.substring(line1.length() - LCD_COLS);
@@ -186,7 +186,6 @@ void displayOnLcd(String line1, String line2, int delayMs) {
   if (delayMs > 0) delay(delayMs);
 }
 
-
 String formatFloat(double num, int precision) {
   char buf[17];
   dtostrf(num, 1, precision, buf);
@@ -194,4 +193,3 @@ String formatFloat(double num, int precision) {
   str.trim();
   return str;
 }
-
