@@ -1,48 +1,39 @@
 #include <Keypad.h>
 #include <LiquidCrystal.h>
 #include <math.h>
-using namespace std;
 
-// === LCD Setup ===
 LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 const int LCD_COLS = 16, LCD_ROWS = 2;
-
-// === Keypad Shared Pins ===
 const byte ROWS_BASIC = 4, COLS_BASIC = 6;
 const byte ROWS_SCI = 4, COLS_SCI = 4;
 
-// === Basic Keypad (4x6) ===
 char keysBasic[ROWS_BASIC][COLS_BASIC] = {
   {'o', '7', '8', '9', '*', '/'},
-  {'N', '4', '5', '6', '-', 'M'},  // 'M' switches to sci
+  {'N', '4', '5', '6', '-', 'M'},
   {'%', '1', '2', '3', '+', 'v'},
   {'R', '0', '.', '=', '+', '^'}
 };
 byte rowPinsBasic[ROWS_BASIC] = {A0, A1, A2, A3};
 byte colPinsBasic[COLS_BASIC] = {0, 1, 2, 3, 4, 5};
 
-// === Scientific Keypad (4x4) ===
 char keysSci[ROWS_SCI][COLS_SCI] = {
-  {'S', 'C', 'T', 'G'},  // sin, cos, tan, cot
-  {'l', 'n', 'e', '!'},  // log, exp, factorial, M to switch back
-  {'D', 'P', 'B', 'H'},  // place for future use
+  {'S', 'C', 'T', 'G'},
+  {'l', 'n', 'e', '!'},
+  {'D', 'P', 'B', 'H'},
   {'I', 'O', 'A', 'M'}
 };
 byte rowPinsSci[ROWS_SCI] = {A0, A1, A2, A3};
-byte colPinsSci[COLS_SCI] = {0, 1, 2, 3};  // reuse 4 pins from basic
+byte colPinsSci[COLS_SCI] = {0, 1, 2, 3};
 
-// === Keypad Objects ===
 Keypad keypadBasic = Keypad(makeKeymap(keysBasic), rowPinsBasic, colPinsBasic, ROWS_BASIC, COLS_BASIC);
 Keypad keypadSci = Keypad(makeKeymap(keysSci), rowPinsSci, colPinsSci, ROWS_SCI, COLS_SCI);
 
-// === Calculator State ===
 String currentInput = "0";
 String previousInput = "";
 char currentOperation = ' ';
 double memoryValue = 0.0;
 bool newOperand = true, isSciMode = false;
 
-// === Function Prototypes ===
 void updateDisplay();
 void displayOnLcd(String line1, String line2 = "", int delayMs = 0);
 void processDigit(char digit);
@@ -52,6 +43,8 @@ void processClear();
 void processSpecialFunction(char funcKey);
 void processScientificKey(char key);
 double calculate(double num1, double num2, char op);
+String decToBin(int decNum);
+String decToHex(int decNum);
 String formatFloat(double num, int precision = 4);
 void toggleMode();
 
@@ -65,35 +58,33 @@ void setup() {
 
 void loop() {
   char key = isSciMode ? keypadSci.getKey() : keypadBasic.getKey();
-
   if (key) {
     if (key == 'M') {
       toggleMode();
     } else if (!isSciMode) {
-      // Basic Mode
       if (isdigit(key) || key == '.') processDigit(key);
       else if (strchr("+-*/", key) || key == '%' || key == '^') processOperator(key);
       else if (key == '=') processEquals();
       else if (key == 'o') processClear();
       else if (key == 'N' || key == 'R' || key == 'v' || key == 't') processSpecialFunction(key);
     } else {
-      // Scientific Mode
       processScientificKey(key);
     }
     updateDisplay();
   }
 }
 
-// === Basic Input Functions ===
 void processDigit(char digit) {
   if (newOperand) {
     currentInput = (digit == '.') ? "0" : "";
     newOperand = false;
   }
 
-  if (digit == '.' && currentInput.indexOf('.') != -1) return;
+  if (digit == '.' && currentInput.indexOf('.') != -1)
+    return;
 
-  if (currentInput.length() < LCD_COLS - 1) currentInput += digit;
+  if (currentInput.length() < LCD_COLS - 1)
+    currentInput += digit;
 }
 
 void processOperator(char op) {
@@ -105,7 +96,6 @@ void processOperator(char op) {
     }
     currentInput = "";
   }
-
   if (previousInput.length() > 0) {
     currentOperation = op;
     newOperand = true;
@@ -132,7 +122,8 @@ void processClear() {
 }
 
 void processSpecialFunction(char funcKey) {
-  if (currentInput == "0") return;
+  if (currentInput == "0")
+    return;
 
   double num = currentInput.toFloat();
   double result = 0.0;
@@ -158,8 +149,9 @@ void processSpecialFunction(char funcKey) {
       }
     case 't': result = num * num; break;
   }
-
   currentInput = formatFloat(result);
+  previousInput = currentInput;
+  currentOperation = ' ';
   newOperand = true;
 }
 
@@ -179,7 +171,6 @@ double calculate(double num1, double num2, char op) {
   }
 }
 
-// === Scientific Mode ===
 void processScientificKey(char key) {
   double num = currentInput.toFloat();
   double result = 0.0;
@@ -206,12 +197,12 @@ void processScientificKey(char key) {
     case 'D': result = pow(10, num); break;
     case 'P': result = pow(num, 2); break;
     case 'B':
-      displayOnLcd(decToBin(num), "", 1000); 
+      displayOnLcd(decToBin(num), "", 5000); 
       processClear();
       updateDisplay();
       break;
     case 'H':
-      displayOnLcd(decToHex(num), "", 1000); 
+      displayOnLcd(decToHex(num), "", 5000); 
       processClear();
       updateDisplay();
       break;
@@ -244,7 +235,7 @@ String decToBin(int decNum) {
   }
   while (decNum > 0) {
     int remainder = decNum % 2;
-    binString = String(remainder) + binString; // Prepend the remainder
+    binString = String(remainder) + binString;
     decNum = decNum / 2;
   }
   return binString;
@@ -263,13 +254,12 @@ String decToHex(int decNum) {
     } else {
       hexDigit = remainder - 10 + 'A';
     }
-    hexString = hexDigit + hexString; // Prepend the hex digit
+    hexString = hexDigit + hexString;
     decNum /= 16;
   }
   return hexString;
 }
 
-// === LCD ===
 void updateDisplay() {
   lcd.clear();
   String line1 = (previousInput.length() > 0 && currentOperation != ' ') ? previousInput + currentOperation : "";
